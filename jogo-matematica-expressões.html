@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Jogo das Expressões - Gerador Automático</title>
+<style>
+    @page { size: A4; margin: 10mm; }
+    body { font-family: 'Arial', sans-serif; background-color: #e0e7ff; margin: 0; padding-top: 70px; }
+
+    /* Painel de Controle (Não sai na impressão) */
+    .no-print {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: #2c3e50;
+        color: white;
+        padding: 12px 15px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .no-print button, .no-print select {
+        padding: 8px 15px;
+        font-size: 14px;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-gerar { background-color: #2ecc71; color: white; }
+    .btn-gerar:hover { background-color: #27ae60; }
+    .btn-imprimir { background-color: #3498db; color: white; }
+    .btn-imprimir:hover { background-color: #2980b9; }
+    
+    .controle-visual {
+        background-color: #34495e;
+        color: white;
+        border: 1px solid #7f8c8d;
+    }
+
+    /* Página A4 */
+    .folha-a4 {
+        width: 190mm;
+        height: 277mm;
+        background-color: white;
+        margin: 10mm auto;
+        padding: 8mm;
+        box-sizing: border-box;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        page-break-after: always;
+    }
+
+    /* Grid das Cartas */
+    .grid-cartas {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        gap: 6mm;
+        height: 100%;
+    }
+
+    /* Estilo das Cartas */
+    .carta {
+        border: 2px dashed #333;
+        border-radius: 10px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 10px;
+        background-color: #ffffff;
+        box-sizing: border-box;
+        overflow: hidden; 
+    }
+    
+    /* Fundo da ilustração com opacidade dinâmica via JS */
+    .bg-icon {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 75%;
+        height: 75%;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    /* Textos sempre acima da ilustração */
+    .id-carta, .badge, .lote-id, .nivel, .expressao {
+        position: relative;
+        z-index: 1;
+    }
+
+    .id-carta {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #7f8c8d;
+    }
+
+    .badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 20px;
+        border: 1px solid #fff;
+    }
+    .badge.facil { background: #2ecc71; }
+    .badge.media { background: #f39c12; }
+    .badge.dificil { background: #e74c3c; }
+    .badge.coringa { background: #9b59b6; }
+
+    .lote-id {
+        position: absolute;
+        bottom: 22px; 
+        font-size: 10px;
+        color: #bdc3c7;
+        letter-spacing: 1px;
+    }
+
+    .nivel {
+        position: absolute;
+        bottom: 5px;
+        font-size: 12px;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    .expressao { font-size: 18px; font-weight: bold; color: #2c3e50; line-height: 1.4; }
+
+    /* Gabarito */
+    .gabarito-container { padding: 5mm; }
+    .gabarito-header {
+        text-align: center;
+        color: #2c3e50;
+        border-bottom: 2px solid #2c3e50;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    .gabarito-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 18px; }
+    .gabarito-coluna { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; }
+    .gabarito-coluna h3 { margin-top: 0; text-align: center; color: #e74c3c; }
+    .gabarito-coluna.facil h3 { color: #2ecc71; }
+    .gabarito-coluna.media h3 { color: #f39c12; }
+
+    /* Tabela de Pontuação */
+    .grid-tabelas { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8mm; height: 100%; box-sizing: border-box; }
+    .tabela-aluno { border: 2px solid #2c3e50; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
+    .tabela-header { font-size: 13px; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; margin-bottom: 5px; }
+    .linha-header { margin-bottom: 4px; }
+    .d-flex-header { display: flex; justify-content: space-between; }
+    .tabela-instrucao { font-size: 11px; color: #555; margin-bottom: 6px; line-height: 1.2; }
+    .tabela-registro { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px; }
+    .tabela-registro th, .tabela-registro td { border: 1px solid #bdc3c7; padding: 2px 4px; text-align: center; height: 16px; }
+    .tabela-registro th { background-color: #ecf0f1; color: #2c3e50; font-weight: bold; }
+    .pentagon-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; justify-items: center; align-items: center; }
+    .pentagon { width: 28px; height: 28px; }
+
+    @media print {
+        body { background-color: white; padding-top: 0; }
+        .no-print { display: none !important; }
+        .folha-a4 { margin: 0; padding: 5mm; box-shadow: none; border: none; }
+    }
+</style>
+</head>
+<body>
+
+    <div class="no-print">
+        <button class="btn-gerar" onclick="gerarNovosDados()">🎲 Gerar Novas Expressões</button>
+        
+        <select id="sel-tema" class="controle-visual" onchange="renderizarVisual()">
+            <option value="monstros">🎨 Tema: Monstrinhos Felizes</option>
+            <option value="animais">🎨 Tema: Animais Divertidos</option>
+            <option value="espaco">🎨 Tema: Espaço Sideral</option>
+        </select>
+        
+        <select id="sel-opacidade" class="controle-visual" onchange="renderizarVisual()">
+            <option value="0.15">💧 Transparência: 15%</option>
+            <option value="0.30">💧 Transparência: 30%</option>
+            <option value="0.50">💧 Transparência: 50%</option>
+        </select>
+
+        <button class="btn-imprimir" onclick="imprimir('jogo')">🖨️ Imprimir Cartas + Gabarito</button>
+        <button class="btn-imprimir" onclick="imprimir('tabelas')">🖨️ Imprimir Tabelas</button>
+    </div>
+
+    <div id="pagina-cartas" class="folha-a4">
+        <div class="grid-cartas" id="container-cartas"></div>
+    </div>
+
+    <div id="pagina-gabarito" class="folha-a4">
+        <div class="gabarito-container">
+            <h1 class="gabarito-header" id="gabarito-titulo">📋 Gabarito Oficial</h1>
+            <div class="gabarito-grid" id="gabarito-lista"></div>
+        </div>
+    </div>
+
+    <div id="pagina-tabelas" class="folha-a4">
+        <div class="grid-tabelas" id="container-tabelas"></div>
+    </div>
+
+<script>
+    // SVGs - Tema Monstrinhos Felizes
+    const svgsMonstros = {
+        facil: `<svg viewBox="0 0 100 100"><path d="M10,80 Q50,10 90,80 Q50,100 10,80" fill="#2ecc71"/><circle cx="35" cy="65" r="6" fill="#fff"/><circle cx="65" cy="65" r="6" fill="#fff"/><circle cx="35" cy="65" r="2" fill="#000"/><circle cx="65" cy="65" r="2" fill="#000"/><path d="M40,75 Q50,85 60,75" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
+        media: `<svg viewBox="0 0 100 100"><rect x="20" y="30" width="60" height="60" rx="15" fill="#f39c12"/><circle cx="50" cy="55" r="14" fill="#fff"/><circle cx="50" cy="55" r="5" fill="#000"/><path d="M40,75 Q50,85 60,75" stroke="#fff" stroke-width="3" fill="none"/><line x1="50" y1="30" x2="50" y2="10" stroke="#f39c12" stroke-width="5"/><circle cx="50" cy="10" r="5" fill="#f39c12"/></svg>`,
+        dificil: `<svg viewBox="0 0 100 100"><polygon points="50,15 90,85 10,85" fill="#e74c3c"/><circle cx="40" cy="65" r="5" fill="#fff"/><circle cx="60" cy="65" r="5" fill="#fff"/><circle cx="40" cy="65" r="2" fill="#000"/><circle cx="60" cy="65" r="2" fill="#000"/><path d="M40,75 Q50,85 60,75" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
+        coringa: `<svg viewBox="0 0 100 100"><path d="M20,90 Q20,30 50,30 Q80,30 80,90 L65,80 L50,90 L35,80 Z" fill="#9b59b6"/><circle cx="35" cy="55" r="6" fill="#fff"/><circle cx="65" cy="55" r="6" fill="#fff"/><circle cx="35" cy="55" r="2" fill="#000"/><circle cx="65" cy="55" r="2" fill="#000"/><path d="M42,68 Q50,75 58,68" stroke="#fff" stroke-width="3" fill="none"/></svg>`
+    };
+
+    // SVGs - Tema Animais Divertidos
+    const svgsAnimais = {
+        facil: `<svg viewBox="0 0 100 100"><polygon points="20,50 20,20 40,35" fill="#e67e22"/><polygon points="80,50 80,20 60,35" fill="#e67e22"/><circle cx="50" cy="60" r="30" fill="#e67e22"/><circle cx="40" cy="55" r="4" fill="#fff"/><circle cx="60" cy="55" r="4" fill="#fff"/><circle cx="40" cy="55" r="2" fill="#000"/><circle cx="60" cy="55" r="2" fill="#000"/><polygon points="45,65 55,65 50,70" fill="#000"/><path d="M40,75 Q50,85 60,75" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
+        media: `<svg viewBox="0 0 100 100"><path d="M30,30 Q10,30 10,60 Q30,60 30,50" fill="#8e44ad"/><path d="M70,30 Q90,30 90,60 Q70,60 70,50" fill="#8e44ad"/><rect x="30" y="30" width="40" height="50" rx="20" fill="#9b59b6"/><circle cx="40" cy="50" r="4" fill="#fff"/><circle cx="60" cy="50" r="4" fill="#fff"/><circle cx="40" cy="50" r="2" fill="#000"/><circle cx="60" cy="50" r="2" fill="#000"/><circle cx="50" cy="60" r="3" fill="#000"/><path d="M40,70 Q50,80 60,70" stroke="#fff" stroke-width="3" fill="none"/></svg>`,
+        dificil: `<svg viewBox="0 0 100 100"><rect x="25" y="30" width="50" height="60" rx="25" fill="#34495e"/><polygon points="25,30 40,40 25,50" fill="#34495e"/><polygon points="75,30 60,40 75,50" fill="#34495e"/><circle cx="35" cy="50" r="8" fill="#fff"/><circle cx="65" cy="50" r="8" fill="#fff"/><circle cx="35" cy="50" r="3" fill="#000"/><circle cx="65" cy="50" r="3" fill="#000"/><polygon points="45,60 55,60 50,70" fill="#f1c40f"/></svg>`,
+        coringa: `<svg viewBox="0 0 100 100"><ellipse cx="40" cy="35" rx="8" ry="25" fill="#ecf0f1"/><ellipse cx="60" cy="35" rx="8" ry="25" fill="#ecf0f1"/><circle cx="50" cy="70" r="25" fill="#ecf0f1"/><circle cx="42" cy="65" r="3" fill="#000"/><circle cx="58" cy="65" r="3" fill="#000"/><circle cx="50" cy="72" r="2" fill="#e74c3c"/><path d="M45,78 Q50,85 55,78" stroke="#000" stroke-width="2" fill="none"/></svg>`
+    };
+
+    // SVGs - Tema Espaço Sideral
+    const svgsEspaco = {
+        facil: `<svg viewBox="0 0 100 100"><polygon points="50,10 61,35 88,35 66,51 74,77 50,61 26,77 34,51 12,35 39,35" fill="#f1c40f"/><circle cx="42" cy="45" r="3" fill="#000"/><circle cx="58" cy="45" r="3" fill="#000"/><path d="M42,55 Q50,65 58,55" stroke="#000" stroke-width="2" fill="none"/></svg>`,
+        media: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="25" fill="#3498db"/><ellipse cx="50" cy="50" rx="40" ry="10" fill="none" stroke="#e67e22" stroke-width="6" transform="rotate(-20 50 50)"/><circle cx="42" cy="45" r="3" fill="#fff"/><circle cx="58" cy="45" r="3" fill="#fff"/><path d="M42,55 Q50,65 58,55" stroke="#fff" stroke-width="2" fill="none"/></svg>`,
+        dificil: `<svg viewBox="0 0 100 100"><polygon points="30,80 50,20 70,80" fill="#e74c3c"/><polygon points="30,80 20,90 40,80" fill="#c0392b"/><polygon points="70,80 80,90 60,80" fill="#c0392b"/><circle cx="50" cy="55" r="8" fill="#ecf0f1"/><circle cx="47" cy="53" r="1.5" fill="#000"/><circle cx="53" cy="53" r="1.5" fill="#000"/><path d="M47,58 Q50,62 53,58" stroke="#000" stroke-width="1.5" fill="none"/><path d="M40,90 Q50,100 60,90" fill="#f39c12"/></svg>`,
+        coringa: `<svg viewBox="0 0 100 100"><path d="M20,50 Q50,10 80,50 Q50,90 20,50" fill="#2ecc71"/><ellipse cx="35" cy="50" rx="8" ry="12" fill="#000" transform="rotate(-30 35 50)"/><ellipse cx="65" cy="50" rx="8" ry="12" fill="#000" transform="rotate(30 65 50)"/><path d="M45,70 Q50,75 55,70" stroke="#000" stroke-width="3" fill="none"/></svg>`
+    };
+
+    const bancoTemas = { monstros: svgsMonstros, animais: svgsAnimais, espaco: svgsEspaco };
+    
+    // Estado do Jogo (Mantém os dados matemáticos separados do visual)
+    let rodadaAtual = [];
+    let loteAtual = "";
+
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    function gerarExpressao(nivel) {
+        while(true) {
+            let tipo = rand(1, 4), a = rand(1, 9), b = rand(1, 9), c = rand(1, 9), exp = "", res = 0;
+            if (nivel === 'facil') {
+                if(tipo===1){ res=a*b+c; exp=`${a} &times; ${b} + ${c}`; } 
+                else if(tipo===2){ if(a*b<c)continue; res=a*b-c; exp=`${a} &times; ${b} - ${c}`; } 
+                else if(tipo===3){ let m=[]; for(let i=1;i<=9;i++)if(a%i===0)m.push(i); b=m[rand(0,m.length-1)]; res=(a/b)+c; exp=`${a} &divide; ${b} + ${c}`; } 
+                else { if(a<=b)continue; res=(a-b)*c; exp=`(${a} - ${b}) &times; ${c}`; }
+                if(res>0 && res<=30) return { exp, res };
+            } else if (nivel === 'media') {
+                if(tipo===1){ let b=rand(2,9),a=b*rand(2,9),c=rand(2,9),d=rand(2,6); res=(a/b)+(c*d); exp=`${a} &divide; ${b} + ${c} &times; ${d}`; } 
+                else if(tipo===2){ let b=rand(2,9),c=rand(2,9),a=rand(b*c+1,99); res=a-(b*c); exp=`${a} - ${b} &times; ${c}`; } 
+                else if(tipo===3){ let b=rand(2,9),a=b*rand(2,9),c=rand(10,30); res=(a/b)+c; exp=`${a} &divide; ${b} + ${c}`; } 
+                else { let d=rand(2,9),a=d*rand(2,6),b=rand(3,9),c=rand(3,9); if(b*c<=a/d)continue; res=(b*c)-(a/d); exp=`${b} &times; ${c} - ${a} &divide; ${d}`; }
+                if(res>0 && res<=50) return { exp, res };
+            } else if (nivel === 'dificil') {
+                if(tipo===1){ let c=rand(10,20),d=rand(10,20),b=rand(10,20),bc=b*c,divs=[]; for(let i=10;i<=40;i++)if(bc%i===0)divs.push(i); if(divs.length===0)continue; d=divs[rand(0,divs.length-1)]; let a=rand(10,50); res=a+(bc/d); exp=`${a} + ${b} &times; ${c} &divide; ${d}`; } 
+                else if(tipo===2){ let c=rand(10,20),b=c*rand(2,5); if(b>99)continue; let d=rand(10,20),sub=(b/c)*d,a=rand(sub+1,99); res=a-sub; exp=`${a} - ${b} &divide; ${c} &times; ${d}`; } 
+                else { let c=rand(10,20),b=c*rand(2,5); if(b>99)continue; let d=rand(10,20),a=rand(10,50); res=a+(b/c)*d; exp=`${a} + ${b} &divide; ${c} &times; ${d}`; }
+                if(res>0 && res<=100) return { exp, res };
+            }
+        }
+    }
+
+    // Apenas gera a matemática e salva no array
+    function gerarNovosDados() {
+        rodadaAtual = [];
+        loteAtual = Math.random().toString(36).substring(2, 6).toUpperCase();
+        
+        // Fáceis (4x)
+        for(let i=0; i<4; i++) {
+            let calc = gerarExpressao('facil');
+            rodadaAtual.push({ id: `F${i+1}`, tipo: 'facil', exp: calc.exp, res: calc.res, pts: 10 });
+        }
+        // Médias (4x)
+        for(let i=0; i<4; i++) {
+            let calc = gerarExpressao('media');
+            rodadaAtual.push({ id: `M${i+1}`, tipo: 'media', exp: calc.exp, res: calc.res, pts: 15 });
+        }
+        // Difíceis (4x)
+        for(let i=0; i<4; i++) {
+            let calc = gerarExpressao('dificil');
+            rodadaAtual.push({ id: `D${i+1}`, tipo: 'dificil', exp: calc.exp, res: calc.res, pts: 25 });
+        }
+        // Coringas (4x)
+        const ptsCoringa = [5, 10, 15, 20];
+        for(let i=0; i<4; i++) {
+            rodadaAtual.push({ id: `C${i+1}`, tipo: 'coringa', exp: `SORTE!<br><br>Avance ${ptsCoringa[i]} pontos`, res: 'Gratis', pts: ptsCoringa[i] });
+        }
+        
+        renderizarVisual();
+    }
+
+    // Lê os dados e desenha na tela com o tema selecionado
+    function renderizarVisual() {
+        if(rodadaAtual.length === 0) return;
+
+        const temaEscolhido = document.getElementById('sel-tema').value;
+        const opacidadeEscolhida = document.getElementById('sel-opacidade').value;
+        const svgs = bancoTemas[temaEscolhido];
+
+        const containerCartas = document.getElementById('container-cartas');
+        const listaGabarito = document.getElementById('gabarito-lista');
+        document.getElementById('gabarito-titulo').innerHTML = `📋 Gabarito Oficial - Lote #${loteAtual}`;
+        
+        containerCartas.innerHTML = '';
+        listaGabarito.innerHTML = '';
+
+        let gabFacil = `<div class="gabarito-coluna facil"><h3>Nível Fácil</h3><ul style="padding-left: 20px;">`;
+        let gabMedia = `<div class="gabarito-coluna media"><h3>Nível Médio</h3><ul style="padding-left: 20px;">`;
+        let gabDificil = `<div class="gabarito-coluna dificil"><h3>Nível Difícil</h3><ul style="padding-left: 20px;">`;
+
+        rodadaAtual.forEach(carta => {
+            // Cartas HTML
+            containerCartas.innerHTML += `
+                <div class="carta">
+                    <div class="bg-icon" style="opacity: ${opacidadeEscolhida};">${svgs[carta.tipo]}</div>
+                    <div class="id-carta">${carta.id}</div>
+                    <div class="badge ${carta.tipo}">+${carta.pts} pts</div>
+                    <div class="expressao">${carta.exp}</div>
+                    <div class="lote-id">#${loteAtual}</div>
+                    <div class="nivel">${carta.tipo === 'coringa' ? 'Coringa' : carta.tipo}</div>
+                </div>`;
+            
+            // Gabarito HTML
+            if(carta.tipo !== 'coringa') {
+                let eqTexto = carta.exp.replace(/&times;/g,'x').replace(/&divide;/g,'÷');
+                let li = `<li style="margin-bottom: 10px;"><b>${carta.id}:</b> ${eqTexto} = <b>${carta.res}</b></li>`;
+                if(carta.tipo === 'facil') gabFacil += li;
+                if(carta.tipo === 'media') gabMedia += li;
+                if(carta.tipo === 'dificil') gabDificil += li;
+            }
+        });
+
+        gabFacil += `</ul></div>`;
+        gabMedia += `</ul></div>`;
+        gabDificil += `</ul></div>`;
+        listaGabarito.innerHTML = gabFacil + gabMedia + gabDificil;
+    }
+
+    function renderizarTabelas() {
+        const svgPentagon = `
+            <svg class="pentagon" viewBox="0 0 100 100">
+                <polygon points="50,5 100,40 82,100 18,100 0,40" fill="#fff" stroke="#2c3e50" stroke-width="6"/>
+                <text x="50" y="65" font-size="26" text-anchor="middle" fill="#2c3e50" font-family="Arial" font-weight="bold">5</text>
+            </svg>
+        `;
+        let tabelasHTML = '';
+        for(let i=0; i<4; i++) {
+            tabelasHTML += `
+                <div class="tabela-aluno">
+                    <div class="tabela-header">
+                        <div class="linha-header"><b>Estudante:</b> ____________________________________</div>
+                        <div class="d-flex-header">
+                            <span><b>Turma:</b> _______________</span>
+                            <span><b>Data:</b> ___/___/202_</span>
+                        </div>
+                    </div>
+                    <div class="tabela-instrucao"><b>Como jogar:</b> Anote o ID da carta e o seu cálculo. Acertou? Pinte 1 pentágono para cada 5 pontos ganhos!</div>
+                    <table class="tabela-registro">
+                        <tr><th>Carta</th><th>Resultado</th><th>Carta</th><th>Resultado</th></tr>
+                        <tr><td></td><td></td><td></td><td></td></tr>
+                        <tr><td></td><td></td><td></td><td></td></tr>
+                        <tr><td></td><td></td><td></td><td></td></tr>
+                        <tr><td></td><td></td><td></td><td></td></tr>
+                        <tr><td></td><td></td><td></td><td></td></tr>
+                    </table>
+                    <div class="pentagon-container">
+                        ${svgPentagon.repeat(20)}
+                    </div>
+                </div>
+            `;
+        }
+        document.getElementById('container-tabelas').innerHTML = tabelasHTML;
+    }
+
+    function imprimir(alvo) {
+        const pagCartas = document.getElementById('pagina-cartas');
+        const pagGabarito = document.getElementById('pagina-gabarito');
+        const pagTabelas = document.getElementById('pagina-tabelas');
+
+        if (alvo === 'jogo') {
+            pagTabelas.style.display = 'none';
+            pagCartas.style.display = 'block';
+            pagGabarito.style.display = 'block';
+            window.print();
+            pagTabelas.style.display = 'block';
+        } else if (alvo === 'tabelas') {
+            pagCartas.style.display = 'none';
+            pagGabarito.style.display = 'none';
+            pagTabelas.style.display = 'block';
+            window.print();
+            pagCartas.style.display = 'block';
+            pagGabarito.style.display = 'block';
+        }
+    }
+
+    window.onload = () => {
+        gerarNovosDados();
+        renderizarTabelas();
+    };
+</script>
+
+</body>
+</html>
